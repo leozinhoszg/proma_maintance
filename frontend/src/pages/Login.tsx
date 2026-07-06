@@ -3,6 +3,7 @@ import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useAuth } from '../auth/AuthContext'
 import { AuthTela } from '../components/AuthTela'
+import { CampoAuth } from '../components/CampoAuth'
 
 const item = {
   initial: { opacity: 0, y: 10 },
@@ -58,37 +59,37 @@ export function Login() {
       )}
 
       <form onSubmit={enviar} className="auth-form">
-        <motion.div className="field" {...item} transition={{ delay: 0.36 }}>
-          <span className="fnum">01</span>
-          <label>E-mail
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="voce@promagroup.com"
-              autoComplete="username"
-              required
-              autoFocus
-            />
-          </label>
+        <motion.div {...item} transition={{ delay: 0.36 }}>
+          <CampoAuth
+            numero="01"
+            rotulo="E-mail"
+            icone="email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="voce@promagroup.com"
+            autoComplete="username"
+            required
+            autoFocus
+          />
         </motion.div>
 
-        <motion.div className="field" {...item} transition={{ delay: 0.42 }}>
-          <span className="fnum">02</span>
-          <label>Senha
-            <input
-              type="password"
-              value={senha}
-              onChange={(e) => setSenha(e.target.value)}
-              placeholder="••••••••"
-              autoComplete="current-password"
-              required
-            />
-          </label>
+        <motion.div {...item} transition={{ delay: 0.42 }}>
+          <CampoAuth
+            numero="02"
+            rotulo="Senha"
+            icone="senha"
+            type="password"
+            value={senha}
+            onChange={(e) => setSenha(e.target.value)}
+            placeholder="sua senha de acesso"
+            autoComplete="current-password"
+            required
+          />
         </motion.div>
 
         <motion.div className="auth-acoes" {...item} transition={{ delay: 0.48 }}>
-          <button className="primario" type="submit" disabled={enviando}>
+          <button className="primario auth-entrar" type="submit" disabled={enviando}>
             {enviando ? 'Verificando…' : 'Entrar'}
           </button>
           <Link to="/esqueci-senha" className="auth-link">Esqueci minha senha</Link>

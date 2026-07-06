@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { apiEsqueciSenha } from '../api'
 import { AuthTela } from '../components/AuthTela'
+import { CampoAuth } from '../components/CampoAuth'
 
 export function EsqueciSenha() {
   const [email, setEmail] = useState('')
@@ -37,19 +38,17 @@ export function EsqueciSenha() {
           <p className="auth-texto">
             Informe o e-mail da sua conta e enviaremos um link para redefinir a senha.
           </p>
-          <div className="field">
-            <span className="fnum">01</span>
-            <label>E-mail
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="voce@promagroup.com"
-                required
-                autoFocus
-              />
-            </label>
-          </div>
+          <CampoAuth
+            numero="01"
+            rotulo="E-mail"
+            icone="email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="voce@promagroup.com"
+            required
+            autoFocus
+          />
           <div className="auth-acoes">
             <button className="primario" type="submit" disabled={enviando}>
               {enviando ? 'Enviando…' : 'Enviar link'}

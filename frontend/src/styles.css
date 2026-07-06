@@ -3,6 +3,7 @@
    Tokens
    ============================================================ */
 :root {
+  color-scheme: dark;
   --bg: #0e141b;
   --bg-deep: #0a0f15;
   --panel: #141c25;
@@ -253,6 +254,17 @@ input:focus, select:focus, textarea:focus {
   outline: none;
   border-color: var(--amber);
   box-shadow: 0 0 0 3px rgba(255, 179, 0, 0.15);
+}
+input::placeholder, textarea::placeholder { color: var(--faint); }
+
+/* autofill do Chrome/Edge: manter o painel escuro em vez do branco padrão */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px var(--bg-deep) inset;
+  -webkit-text-fill-color: var(--text);
+  caret-color: var(--text);
+  transition: background-color 99999s ease-in-out 0s;
 }
 :focus-visible {
   outline: 2px solid var(--amber);
@@ -814,14 +826,120 @@ button.acao.concluir:hover { background: var(--green); color: #0a0f15; }
   line-height: 1.6;
   margin: 0 0 16px;
 }
-.auth-form .field { padding: 12px 0; }
-.auth-acoes {
+/* campo das telas de acesso — ícone + acento âmbar animado no foco */
+.campo-auth {
+  display: grid;
+  gap: 9px;
+  padding: 11px 0;
+}
+.campo-rotulo {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-family: var(--font-display);
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--muted);
+}
+.campo-rotulo b {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--faint);
+}
+.campo-caps {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-style: normal;
+  letter-spacing: 0.12em;
+  color: var(--amber);
+}
+
+.campo-caixa {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 18px;
-  margin-top: 20px;
+  gap: 12px;
+  height: 52px;
+  padding: 0 16px;
+  background: var(--bg-deep);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
 }
-.auth-acoes .primario { flex: none; }
+.campo-caixa > svg {
+  flex: none;
+  width: 17px;
+  height: 17px;
+  color: var(--faint);
+  transition: color 0.18s ease;
+}
+.campo-caixa input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  font-size: 15px;
+  color: var(--text);
+}
+.campo-caixa input:focus { box-shadow: none; outline: none; }
+.campo-caixa input:-webkit-autofill,
+.campo-caixa input:-webkit-autofill:hover,
+.campo-caixa input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px var(--bg-deep) inset;
+}
+/* acento inferior que desliza no foco */
+.campo-caixa::after {
+  content: '';
+  position: absolute;
+  left: -1px; right: -1px; bottom: -1px;
+  height: 2px;
+  background: var(--amber);
+  border-radius: 0 0 4px 4px;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.campo-caixa:focus-within {
+  border-color: color-mix(in srgb, var(--amber) 45%, var(--line));
+  box-shadow: 0 8px 28px rgba(255, 179, 0, 0.08);
+}
+.campo-caixa:focus-within::after { transform: scaleX(1); }
+.campo-caixa:focus-within > svg { color: var(--amber); }
+
+.campo-olho {
+  flex: none;
+  display: flex;
+  padding: 6px;
+  margin-right: -6px;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  color: var(--faint);
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+.campo-olho:hover { color: var(--text); }
+.campo-olho svg { width: 18px; height: 18px; }
+
+.auth-acoes {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  margin-top: 22px;
+}
+.auth-acoes .primario {
+  width: 100%;
+  padding: 15px 28px;
+  font-size: 14px;
+}
 .auth-link {
   font-size: 13.5px;
   color: var(--muted);

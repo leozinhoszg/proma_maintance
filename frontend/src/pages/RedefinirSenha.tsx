@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { apiRedefinirSenha } from '../api'
 import { AuthTela } from '../components/AuthTela'
+import { CampoAuth } from '../components/CampoAuth'
 
 /** Atende o reset de senha e o aceite de convite (?convite=1) — mesmo token. */
 export function RedefinirSenha() {
@@ -62,33 +63,29 @@ export function RedefinirSenha() {
             </p>
           )}
           {erro && <div className="stamp erro" role="alert">✕ {erro}</div>}
-          <div className="field">
-            <span className="fnum">01</span>
-            <label>Nova senha
-              <input
-                type="password"
-                value={senha}
-                onChange={(e) => setSenha(e.target.value)}
-                placeholder="mínimo 8 caracteres"
-                autoComplete="new-password"
-                required
-                autoFocus
-              />
-            </label>
-          </div>
-          <div className="field">
-            <span className="fnum">02</span>
-            <label>Confirmar senha
-              <input
-                type="password"
-                value={confirmar}
-                onChange={(e) => setConfirmar(e.target.value)}
-                placeholder="repita a senha"
-                autoComplete="new-password"
-                required
-              />
-            </label>
-          </div>
+          <CampoAuth
+            numero="01"
+            rotulo="Nova senha"
+            icone="senha"
+            type="password"
+            value={senha}
+            onChange={(e) => setSenha(e.target.value)}
+            placeholder="mínimo 8 caracteres"
+            autoComplete="new-password"
+            required
+            autoFocus
+          />
+          <CampoAuth
+            numero="02"
+            rotulo="Confirmar senha"
+            icone="senha"
+            type="password"
+            value={confirmar}
+            onChange={(e) => setConfirmar(e.target.value)}
+            placeholder="repita a senha"
+            autoComplete="new-password"
+            required
+          />
           <div className="auth-acoes">
             <button className="primario" type="submit" disabled={enviando || !token}>
               {enviando ? 'Salvando…' : ehConvite ? 'Definir senha' : 'Redefinir senha'}
