@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { listarChamados, atualizarStatus } from '../api'
 import { useSSE } from '../useSSE'
+import { useAuth } from '../auth/AuthContext'
 import { ordenarFila, tempoRelativo } from '../fila'
 import type { Chamado, Status } from '../types'
 
@@ -32,6 +33,8 @@ function dataCurta(iso: string): string {
 }
 
 export function PainelManutencao() {
+  const { usuario } = useAuth()
+  const podeAtender = Boolean(usuario?.perfil.pode_atender)
   const [chamados, setChamados] = useState<Chamado[]>([])
   const [aba, setAba] = useState<Aba>('fila')
   // ids chegados via SSE nesta sessão — recebem o flash âmbar de entrada
@@ -205,7 +208,8 @@ export function PainelManutencao() {
                 </div>
                 <p className="chamado-desc">{c.descricao}</p>
                 <span className="chamado-quem">
-                  <b>{c.operador}</b> · aberto {dataCurta(c.criado_em)}
+                  <b>{c.solicitante_nome}</b> · aberto {dataCurta(c.criado_em)}
+                  {c.atendente_nome && <> · atendente: <b>{c.atendente_nome}</b></>}
                 </span>
               </div>
 
@@ -216,12 +220,12 @@ export function PainelManutencao() {
                   {c.status === 'em_atendimento' && `aberto ${tempoRelativo(c.criado_em)}`}
                   {c.status === 'concluido' && `concluído ${dataCurta(c.atualizado_em)}`}
                 </span>
-                {c.status === 'aberto' && (
+                {podeAtender && c.status === 'aberto' && (
                   <button className="acao" onClick={() => mudar(c.id, 'em_atendimento')}>
                     Assumir
                   </button>
                 )}
-                {c.status === 'em_atendimento' && (
+                {podeAtender && c.status === 'em_atendimento' && (
                   <button className="acao concluir" onClick={() => mudar(c.id, 'concluido')}>
                     Concluir
                   </button>

@@ -3,6 +3,24 @@
 O operador de fábrica abre chamados de manutenção para máquinas; a equipe de
 manutenção acompanha e atende em **tempo real** via Server-Sent Events (SSE).
 
+Com **autenticação** (sessão httpOnly), **3 perfis** (Solicitante, Atendente,
+Admin), convite/reset de senha por **e-mail SMTP** e **configurações dinâmicas**
+gerenciadas pelo admin — sem hardcode e sem restart.
+
+## Acesso inicial (dev)
+
+O seed cria três contas (defina `ADMIN_*` no `.env` para trocar o admin):
+
+| Perfil | E-mail | Senha |
+|---|---|---|
+| Admin | `admin@proma.local` | `admin1234` |
+| Atendente | `ana.souza@proma.local` | `atendente1234` |
+| Solicitante | `carlos.silva@proma.local` | `solicitante1234` |
+
+> Troque essas senhas em qualquer ambiente que não seja de desenvolvimento.
+> SMTP: configure host/porta/credenciais em **Admin → Configurações** — sem SMTP,
+> os e-mails (convite/reset) são simulados no console do backend.
+
 ## Requisitos
 - Node.js 20+
 - MySQL rodando

@@ -13,7 +13,6 @@ describe('AbrirChamado', () => {
     fireEvent.change(screen.getByLabelText(/^Máquina$/i), { target: { value: 'Prensa 3' } })
     fireEvent.change(screen.getByLabelText(/Setor/i), { target: { value: 'Estamparia' } })
     fireEvent.change(screen.getByLabelText(/Descrição/i), { target: { value: 'Ruído' } })
-    fireEvent.change(screen.getByLabelText(/Operador/i), { target: { value: 'João' } })
     fireEvent.click(screen.getByRole('button', { name: /Abrir chamado/i }))
 
     await waitFor(() => expect(spy).toHaveBeenCalled())

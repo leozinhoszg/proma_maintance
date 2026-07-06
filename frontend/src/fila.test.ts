@@ -5,7 +5,9 @@ import type { Chamado } from './types'
 function ch(over: Partial<Chamado>): Chamado {
   return {
     id: 1, maquina: 'M', setor: 'S', tipo_problema: 'outro', prioridade: 'media',
-    descricao: '', operador: 'O', maquina_parada: false, status: 'aberto',
+    descricao: '', solicitante_id: 1, solicitante_nome: 'O',
+    atendente_id: null, atendente_nome: null,
+    maquina_parada: false, status: 'aberto',
     criado_em: '2026-07-06T08:00:00Z', atualizado_em: '2026-07-06T08:00:00Z',
     ...over,
   }

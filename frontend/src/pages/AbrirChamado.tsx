@@ -24,7 +24,7 @@ const PRIORIDADES: { valor: Prioridade; rotulo: string }[] = [
 
 const vazio: NovoChamado = {
   maquina: '', setor: '', tipo_problema: 'mecanico', prioridade: 'media',
-  descricao: '', operador: '', maquina_parada: false,
+  descricao: '', maquina_parada: false,
 }
 
 export function AbrirChamado() {
@@ -77,7 +77,7 @@ export function AbrirChamado() {
         >
           <div className="os-form-head">
             <span className="os-tag">Formulário de abertura</span>
-            <span className="os-hint">campos 01–07</span>
+            <span className="os-hint">campos 01–06</span>
           </div>
 
           <div className="os-fields">
@@ -141,20 +141,8 @@ export function AbrirChamado() {
               </label>
             </div>
 
-            <div className="field">
-              <span className="fnum">06</span>
-              <label>Operador
-                <input
-                  value={form.operador}
-                  onChange={(e) => set('operador', e.target.value)}
-                  placeholder="Nome ou matrícula"
-                  required
-                />
-              </label>
-            </div>
-
             <div className="field field-parada">
-              <span className="fnum">07</span>
+              <span className="fnum">06</span>
               <label>
                 <input
                   type="checkbox"

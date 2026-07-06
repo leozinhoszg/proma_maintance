@@ -29,6 +29,20 @@ export function ComoUsar() {
       </section>
 
       <section className="manual-sec">
+        <h2>Acesso e perfis</h2>
+        <p>
+          O acesso é feito com <b>e-mail e senha</b>. As contas são criadas pelo
+          administrador — você recebe um e-mail de convite para definir sua senha.
+          Esqueceu a senha? Use <b>“Esqueci minha senha”</b> na tela de login.
+        </p>
+        <ul className="lista-simples">
+          <li><b>Solicitante</b> — abre chamados e acompanha o painel.</li>
+          <li><b>Atendente</b> — tudo do solicitante + assume e conclui chamados.</li>
+          <li><b>Admin</b> — tudo + gerencia usuários, perfis e configurações.</li>
+        </ul>
+      </section>
+
+      <section className="manual-sec">
         <h2>Abrir um chamado (operador)</h2>
         <ol className="passos">
           <li>
@@ -49,7 +63,7 @@ export function ComoUsar() {
             (ruído, vazamento, erro na tela). Quanto mais claro, mais rápido o reparo.
           </li>
           <li>
-            <b>Máquina parada?</b> — ligue a chave <b>07</b> se a produção está
+            <b>Máquina parada?</b> — ligue a chave <b>06</b> se a produção está
             interrompida. Isso coloca o chamado no topo da fila.
           </li>
         </ol>
