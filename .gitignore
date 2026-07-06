@@ -1,4 +1,37 @@
+# Dependências
 node_modules/
+
+# Builds
 dist/
+build/
+
+# Ambiente e segredos — nunca versionar credenciais
 .env
+.env.local
+.env.*.local
+
+# Logs
 *.log
+npm-debug.log*
+logs/
+
+# Testes e cobertura
+coverage/
+.nyc_output/
+
+# Cache de ferramentas
+.vite/
+.eslintcache
+*.tsbuildinfo
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editores/IDE
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
