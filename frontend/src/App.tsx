@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { NavLink, Route, Routes } from 'react-router-dom'
 import { AbrirChamado } from './pages/AbrirChamado'
 import { PainelManutencao } from './pages/PainelManutencao'
+import { ComoUsar } from './pages/ComoUsar'
 
 /** Relógio de sala de controle — HH:MM:SS tabular. */
 function Relogio() {
@@ -28,6 +29,9 @@ export function App() {
           <NavLink to="/painel" className={({ isActive }) => (isActive ? 'ativo' : '')}>
             Painel Manutenção
           </NavLink>
+          <NavLink to="/ajuda" className={({ isActive }) => (isActive ? 'ativo' : '')}>
+            Como usar
+          </NavLink>
         </nav>
         <Relogio />
       </header>
@@ -36,6 +40,7 @@ export function App() {
         <Routes>
           <Route path="/" element={<AbrirChamado />} />
           <Route path="/painel" element={<PainelManutencao />} />
+          <Route path="/ajuda" element={<ComoUsar />} />
         </Routes>
       </main>
     </>
