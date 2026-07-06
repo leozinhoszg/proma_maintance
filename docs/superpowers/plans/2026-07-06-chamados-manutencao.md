@@ -885,6 +885,7 @@ Expected: sem erros.
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
+    "noEmit": true,
     "types": ["vitest/globals", "@testing-library/jest-dom"]
   },
   "include": ["src"]
