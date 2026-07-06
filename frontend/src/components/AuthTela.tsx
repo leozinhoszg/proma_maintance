@@ -26,7 +26,7 @@ export function AuthTela({ children }: { children: ReactNode }) {
         transition={{ duration: 0.5, ease: 'easeOut' }}
       >
         <strong>PROMA</strong>
-        <span>Manutenção</span>
+        <span>MAINTANCE</span>
       </motion.header>
 
       <motion.div

@@ -16,7 +16,7 @@ function layoutBase(titulo: string, corpo: string): string {
         <tr>
           <td style="background:${GRAFITE};padding:20px 28px;">
             <span style="font-size:18px;font-weight:bold;color:#ffffff;letter-spacing:2px;">PROMA</span>
-            <span style="font-size:11px;color:#ffb300;letter-spacing:3px;text-transform:uppercase;">&nbsp;&nbsp;Manutenção</span>
+            <span style="font-size:18px;font-weight:bold;color:#ffb300;letter-spacing:2px;text-transform:uppercase;">&nbsp;MAINTANCE</span>
           </td>
         </tr>
         <tr><td style="height:5px;background:repeating-linear-gradient(-45deg,#ffb300 0 10px,${GRAFITE} 10px 20px);font-size:0;">&nbsp;</td></tr>

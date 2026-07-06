@@ -73,12 +73,13 @@ body {
   font-weight: 700;
   color: var(--text);
 }
+/* mesma tipografia do "PROMA", em âmbar */
 .brand span {
-  font-size: 12px;
-  font-weight: 500;
+  font-size: 18px;
+  font-weight: 700;
   color: var(--amber);
   text-transform: uppercase;
-  letter-spacing: 0.22em;
+  letter-spacing: 0.08em;
 }
 
 .shell-nav {
@@ -784,11 +785,13 @@ button.acao.concluir:hover { background: var(--green); color: #0a0f15; }
   letter-spacing: 0.08em;
 }
 .auth-brand strong { font-size: 24px; font-weight: 700; }
+/* mesma tipografia do "PROMA", em âmbar */
 .auth-brand span {
-  font-size: 13px;
+  font-size: 24px;
+  font-weight: 700;
   color: var(--amber);
   text-transform: uppercase;
-  letter-spacing: 0.26em;
+  letter-spacing: 0.08em;
 }
 
 .auth-card {

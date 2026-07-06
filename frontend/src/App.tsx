@@ -43,7 +43,7 @@ function ShellProtegido() {
       <header className="shell-header">
         <div className="brand">
           <strong>PROMA</strong>
-          <span>Manutenção</span>
+          <span>MAINTANCE</span>
         </div>
         <nav className="shell-nav">
           {usuario.perfil.pode_abrir && (
