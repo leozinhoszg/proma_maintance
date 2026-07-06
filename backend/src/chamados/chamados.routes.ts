@@ -12,11 +12,13 @@ import {
   type Status,
 } from './chamados.types.js'
 import { broadcast } from '../sse/sse.broker.js'
+import { exigirAuth, exigirPermissao } from '../auth/middleware.js'
+import { asyncHandler } from '../http/async.js'
 
 const router = Router()
 
 function validarNovo(body: any): string | null {
-  const campos = ['maquina', 'setor', 'tipo_problema', 'prioridade', 'descricao', 'operador']
+  const campos = ['maquina', 'setor', 'tipo_problema', 'prioridade', 'descricao']
   for (const c of campos) {
     if (typeof body[c] !== 'string' || body[c].trim() === '') return `campo obrigatorio: ${c}`
   }
@@ -26,36 +28,54 @@ function validarNovo(body: any): string | null {
   return null
 }
 
-router.post('/chamados', async (req, res) => {
+router.post('/chamados', exigirAuth, exigirPermissao('pode_abrir'), asyncHandler(async (req, res) => {
   const erro = validarNovo(req.body)
-  if (erro) return res.status(400).json({ error: erro })
-  const chamado = await criarChamado(req.body as NovoChamado)
+  if (erro) {
+    res.status(400).json({ error: erro })
+    return
+  }
+  // solicitante vem da sessão — o payload não decide quem abriu
+  const { maquina, setor, tipo_problema, prioridade, descricao, maquina_parada } = req.body as NovoChamado
+  const chamado = await criarChamado(
+    { maquina, setor, tipo_problema, prioridade, descricao, maquina_parada },
+    req.usuario!.id,
+  )
   broadcast('chamado:criado', chamado)
   res.status(201).json(chamado)
-})
+}))
 
-router.get('/chamados', async (req, res) => {
+router.get('/chamados', exigirAuth, asyncHandler(async (req, res) => {
   const status = req.query.status as Status | undefined
   if (status && !STATUSES.includes(status)) {
-    return res.status(400).json({ error: 'status invalido' })
+    res.status(400).json({ error: 'status invalido' })
+    return
   }
-  const chamados = await listarChamados(status)
-  res.json(chamados)
-})
+  res.json(await listarChamados(status))
+}))
 
-router.patch('/chamados/:id/status', async (req, res) => {
+router.patch('/chamados/:id/status', exigirAuth, exigirPermissao('pode_atender'), asyncHandler(async (req, res) => {
   const id = Number(req.params.id)
-  const novo = req.body.status as Status
-  if (!STATUSES.includes(novo)) return res.status(400).json({ error: 'status invalido' })
+  const novo = req.body?.status as Status
+  if (!Number.isInteger(id) || !STATUSES.includes(novo)) {
+    res.status(400).json({ error: 'dados invalidos' })
+    return
+  }
   try {
-    const chamado = await atualizarStatus(id, novo)
+    const chamado = await atualizarStatus(id, novo, req.usuario!.id)
     broadcast('chamado:atualizado', chamado)
     res.json(chamado)
   } catch (e) {
     const msg = (e as Error).message
-    const code = msg === 'chamado nao encontrado' ? 404 : 400
-    res.status(code).json({ error: msg })
+    if (msg === 'chamado nao encontrado') {
+      res.status(404).json({ error: msg })
+      return
+    }
+    if (msg === 'transicao invalida') {
+      res.status(400).json({ error: msg })
+      return
+    }
+    throw e
   }
-})
+}))
 
 export default router

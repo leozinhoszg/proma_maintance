@@ -13,20 +13,23 @@ export interface Chamado {
   tipo_problema: TipoProblema
   prioridade: Prioridade
   descricao: string
-  operador: string
+  solicitante_id: number
+  solicitante_nome: string
+  atendente_id: number | null
+  atendente_nome: string | null
   maquina_parada: boolean
   status: Status
   criado_em: string
   atualizado_em: string
 }
 
+/** Payload do POST — o solicitante vem da sessão, nunca do corpo. */
 export interface NovoChamado {
   maquina: string
   setor: string
   tipo_problema: TipoProblema
   prioridade: Prioridade
   descricao: string
-  operador: string
   maquina_parada: boolean
 }
 
