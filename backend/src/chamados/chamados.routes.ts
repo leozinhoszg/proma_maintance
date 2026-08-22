@@ -3,6 +3,8 @@ import {
   criarChamado,
   listarChamados,
   atualizarStatus,
+  ChamadoNaoEncontradoError,
+  TransicaoChamadoConflitanteError,
 } from './chamados.service.js'
 import {
   TIPOS_PROBLEMA,
@@ -65,13 +67,12 @@ router.patch('/chamados/:id/status', exigirAuth, exigirPermissao('pode_atender')
     broadcast('chamado:atualizado', chamado)
     res.json(chamado)
   } catch (e) {
-    const msg = (e as Error).message
-    if (msg === 'chamado nao encontrado') {
-      res.status(404).json({ error: msg })
+    if (e instanceof ChamadoNaoEncontradoError) {
+      res.status(404).json({ error: e.message })
       return
     }
-    if (msg === 'transicao invalida') {
-      res.status(400).json({ error: msg })
+    if (e instanceof TransicaoChamadoConflitanteError) {
+      res.status(409).json({ error: e.message })
       return
     }
     throw e

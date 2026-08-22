@@ -1,9 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-const mockKnex = vi.fn()
-vi.mock('../db/knex', () => ({ default: (table: string) => mockKnex(table) }))
+const { mockKnex } = vi.hoisted(() => ({ mockKnex: vi.fn() }))
+vi.mock('../db/knex', () => ({ default: mockKnex }))
 
-import { criarChamado, atualizarStatus } from './chamados.service'
+import {
+  ChamadoNaoEncontradoError,
+  TransicaoChamadoConflitanteError,
+  criarChamado,
+  atualizarStatus,
+} from './chamados.service'
 import type { NovoChamado } from './chamados.types'
 
 const novo: NovoChamado = {
@@ -17,16 +22,17 @@ const novo: NovoChamado = {
 
 beforeEach(() => {
   mockKnex.mockReset()
+  ;(mockKnex as any).transaction = vi.fn(async (callback) => callback(mockKnex))
 })
 
-function builder(first: unknown) {
+function builder(first: unknown, updated = 1) {
   return {
     insert: vi.fn().mockResolvedValue([1]),
     where: vi.fn().mockReturnThis(),
     join: vi.fn().mockReturnThis(),
     leftJoin: vi.fn().mockReturnThis(),
     select: vi.fn().mockReturnThis(),
-    update: vi.fn().mockResolvedValue(1),
+    update: vi.fn().mockResolvedValue(updated),
     first: vi.fn().mockResolvedValue(first),
   } as any
 }
@@ -52,6 +58,7 @@ describe('atualizarStatus', () => {
 
     await atualizarStatus(1, 'em_atendimento', 7)
 
+    expect(b.where).toHaveBeenCalledWith({ id: 1, status: 'aberto' })
     expect(b.update).toHaveBeenCalledWith(
       expect.objectContaining({ status: 'em_atendimento', atendente_id: 7 }),
     )
@@ -63,16 +70,27 @@ describe('atualizarStatus', () => {
 
     await atualizarStatus(1, 'concluido', 99)
 
+    expect(b.where).toHaveBeenCalledWith({ id: 1, status: 'em_atendimento' })
     expect(b.update).toHaveBeenCalledWith({ status: 'concluido' })
   })
 
-  it('rejeita transição inválida', async () => {
-    mockKnex.mockReturnValue(builder({ id: 1, status: 'aberto' }))
-    await expect(atualizarStatus(1, 'concluido', 7)).rejects.toThrow('transicao invalida')
+  it('rejeita transição perdida para outro request', async () => {
+    mockKnex.mockReturnValue(builder({ id: 1 }, 0))
+    await expect(atualizarStatus(1, 'em_atendimento', 7)).rejects.toBeInstanceOf(
+      TransicaoChamadoConflitanteError,
+    )
+  })
+
+  it('rejeita retorno ao estado aberto', async () => {
+    await expect(atualizarStatus(1, 'aberto', 7)).rejects.toBeInstanceOf(
+      TransicaoChamadoConflitanteError,
+    )
   })
 
   it('lança erro quando o chamado não existe', async () => {
-    mockKnex.mockReturnValue(builder(undefined))
-    await expect(atualizarStatus(999, 'em_atendimento', 7)).rejects.toThrow('chamado nao encontrado')
+    mockKnex.mockReturnValue(builder(undefined, 0))
+    await expect(atualizarStatus(999, 'em_atendimento', 7)).rejects.toBeInstanceOf(
+      ChamadoNaoEncontradoError,
+    )
   })
 })
