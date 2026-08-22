@@ -14,6 +14,11 @@ export const app = express()
 app.use(helmet({ contentSecurityPolicy: false }))
 app.disable('x-powered-by')
 
+app.get('/healthz', (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store')
+  res.status(200).json({ status: 'ok' })
+})
+
 // sem middleware de CORS: requisições cross-origin são negadas por padrão —
 // o frontend fala com a API pelo proxy same-origin do Vite
 app.use(express.json({ limit: '100kb' }))
