@@ -31,11 +31,37 @@ cd backend
 cp .env.example .env   # ajuste as credenciais do MySQL
 # crie o banco (ajuste usuário se necessário):
 #   mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS chamados;"
-npm install
-npm run migrate        # cria a tabela chamados
-npm run seed           # popula com chamados de exemplo
+npm ci
+npm run migrate        # aplica todas as migrations
+npm run seed           # DEV ONLY: apaga dados e carrega exemplos
 npm run dev            # http://localhost:3001
 ```
+
+## Atualização de banco existente
+
+Pare o backend e confirme um backup restaurável antes de executar:
+
+```bash
+cd backend
+npm run migrate
+```
+
+A migration 002 preserva os chamados criados pelo schema 001. Cada valor
+distinto de `operador` é convertido em um usuário inativo, sem senha e com
+e-mail local não entregável. Esses usuários devem ser reconciliados com contas
+reais pelo administrador.
+
+Não execute `npm run seed` em um banco com dados. O seed é exclusivo para
+desenvolvimento e limpa as tabelas antes de inserir os exemplos.
+
+Para desfazer somente a última migration:
+
+```bash
+npm run migrate:down
+```
+
+O rollback restaura o campo `operador`, mas remove as tabelas de autenticação
+introduzidas pela migration 002. Faça backup antes de qualquer rollback.
 
 ## Frontend
 ```bash
@@ -52,6 +78,17 @@ instantaneamente, sem recarregar.
 ```bash
 cd backend  && npm test
 cd frontend && npm test
+```
+
+### Integração com MySQL
+
+O usuário configurado no ambiente precisa poder criar e remover databases de
+teste. A suíte cria somente databases temporários com prefixo
+`proma_migration_test_`.
+
+```bash
+cd backend
+npm run test:integration
 ```
 
 ## Como o SSE funciona aqui
