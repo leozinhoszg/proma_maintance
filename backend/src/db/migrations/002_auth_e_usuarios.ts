@@ -1,4 +1,9 @@
+import { createHash } from 'node:crypto'
 import type { Knex } from 'knex'
+
+// MySQL commits DDL implicitly. Keep the data backfill transaction explicit
+// instead of presenting the whole migration as atomic.
+export const config = { transaction: false }
 
 export async function up(knex: Knex): Promise<void> {
   // perfis dinâmicos — permissões gerenciáveis pelo admin
@@ -54,29 +59,90 @@ export async function up(knex: Knex): Promise<void> {
     t.timestamp('atualizado_em').notNullable().defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'))
   })
 
-  // chamados refeitos: vínculo com usuários no lugar do texto livre
-  await knex.schema.dropTableIfExists('chamados')
-  await knex.schema.createTable('chamados', (t) => {
-    t.increments('id').primary()
-    t.string('maquina', 120).notNullable()
-    t.string('setor', 120).notNullable()
-    t.enum('tipo_problema', ['eletrico', 'mecanico', 'hidraulico', 'software', 'outro']).notNullable()
-    t.enum('prioridade', ['baixa', 'media', 'alta', 'urgente']).notNullable()
-    t.text('descricao').notNullable()
-    t.integer('solicitante_id').unsigned().notNullable().references('id').inTable('usuarios')
-    t.integer('atendente_id').unsigned().nullable().references('id').inTable('usuarios')
-    t.boolean('maquina_parada').notNullable().defaultTo(false)
-    t.enum('status', ['aberto', 'em_atendimento', 'concluido']).notNullable().defaultTo('aberto')
-    t.timestamp('criado_em').notNullable().defaultTo(knex.fn.now())
-    t.timestamp('atualizado_em').notNullable().defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'))
+  await knex.raw(`
+    ALTER TABLE \`chamados\`
+      ADD COLUMN \`solicitante_id\` INT UNSIGNED NULL AFTER \`operador\`,
+      ADD COLUMN \`atendente_id\` INT UNSIGNED NULL AFTER \`solicitante_id\`
+  `)
+
+  await knex.transaction(async (trx) => {
+    const linhas = await trx<{ operador: string }>('chamados').select('operador')
+    const operadores = [...new Set(linhas.map(({ operador }) => operador))]
+
+    if (operadores.length === 0) return
+
+    const [perfilId] = await trx('perfis').insert({
+      nome: 'Solicitante legado',
+      pode_abrir: true,
+      pode_atender: false,
+      pode_administrar: false,
+    })
+
+    for (const operador of operadores) {
+      const hash = createHash('sha256').update(operador, 'utf8').digest('hex')
+      const [usuarioId] = await trx('usuarios').insert({
+        nome: operador,
+        email: `legacy+${hash}@proma.invalid`,
+        senha_hash: null,
+        perfil_id: perfilId,
+        ativo: false,
+      })
+
+      await trx.raw(
+        `UPDATE \`chamados\`
+         SET \`solicitante_id\` = ?,
+             \`atualizado_em\` = \`atualizado_em\`
+         WHERE BINARY \`operador\` = BINARY ?`,
+        [usuarioId, operador],
+      )
+    }
+
+    const naoMapeado = await trx('chamados').whereNull('solicitante_id').first('id')
+    if (naoMapeado) throw new Error('nao foi possivel mapear todos os operadores legados')
   })
+
+  await knex.raw(`
+    ALTER TABLE \`chamados\`
+      MODIFY COLUMN \`solicitante_id\` INT UNSIGNED NOT NULL,
+      ADD CONSTRAINT \`chamados_solicitante_id_foreign\`
+        FOREIGN KEY (\`solicitante_id\`) REFERENCES \`usuarios\` (\`id\`),
+      ADD CONSTRAINT \`chamados_atendente_id_foreign\`
+        FOREIGN KEY (\`atendente_id\`) REFERENCES \`usuarios\` (\`id\`),
+      DROP COLUMN \`operador\`
+  `)
 }
 
 export async function down(knex: Knex): Promise<void> {
-  await knex.schema.dropTableIfExists('chamados')
-  await knex.schema.dropTableIfExists('configuracoes')
-  await knex.schema.dropTableIfExists('tokens_senha')
-  await knex.schema.dropTableIfExists('sessoes')
-  await knex.schema.dropTableIfExists('usuarios')
-  await knex.schema.dropTableIfExists('perfis')
+  await knex.raw(`
+    ALTER TABLE \`chamados\`
+      ADD COLUMN \`operador\` VARCHAR(120) NULL AFTER \`descricao\`
+  `)
+
+  await knex.transaction(async (trx) => {
+    await trx.raw(`
+      UPDATE \`chamados\` AS \`c\`
+      INNER JOIN \`usuarios\` AS \`u\`
+        ON \`u\`.\`id\` = \`c\`.\`solicitante_id\`
+      SET \`c\`.\`operador\` = \`u\`.\`nome\`,
+          \`c\`.\`atualizado_em\` = \`c\`.\`atualizado_em\`
+    `)
+
+    const naoMapeado = await trx('chamados').whereNull('operador').first('id')
+    if (naoMapeado) throw new Error('nao foi possivel restaurar todos os operadores')
+  })
+
+  await knex.raw(`
+    ALTER TABLE \`chamados\`
+      DROP FOREIGN KEY \`chamados_solicitante_id_foreign\`,
+      DROP FOREIGN KEY \`chamados_atendente_id_foreign\`,
+      MODIFY COLUMN \`operador\` VARCHAR(120) NOT NULL,
+      DROP COLUMN \`solicitante_id\`,
+      DROP COLUMN \`atendente_id\`
+  `)
+
+  await knex.schema.dropTable('configuracoes')
+  await knex.schema.dropTable('tokens_senha')
+  await knex.schema.dropTable('sessoes')
+  await knex.schema.dropTable('usuarios')
+  await knex.schema.dropTable('perfis')
 }

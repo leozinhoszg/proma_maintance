@@ -6,9 +6,11 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
-    "migrate": "knex migrate:latest --knexfile knexfile.ts",
-    "seed": "knex seed:run --knexfile knexfile.ts",
-    "test": "vitest run"
+    "migrate": "tsx ./node_modules/knex/bin/cli.js migrate:latest --knexfile knexfile.ts",
+    "migrate:down": "tsx ./node_modules/knex/bin/cli.js migrate:down --knexfile knexfile.ts",
+    "seed": "tsx ./node_modules/knex/bin/cli.js seed:run --knexfile knexfile.ts",
+    "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
