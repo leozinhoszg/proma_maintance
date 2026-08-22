@@ -1,5 +1,5 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
-import { apiEu, apiLogin, apiLogout } from '../api'
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
+import { EVENTO_NAO_AUTORIZADO, apiEu, apiLogin, apiLogout } from '../api'
 import type { Usuario } from '../types'
 
 interface AuthValor {
@@ -15,17 +15,30 @@ const AuthContext = createContext<AuthValor | null>(null)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [usuario, setUsuario] = useState<Usuario | null>(null)
   const [carregando, setCarregando] = useState(true)
+  const versaoAuth = useRef(0)
 
   useEffect(() => {
-    apiEu().then((u) => {
-      setUsuario(u)
+    const versao = versaoAuth.current
+    apiEu()
+      .then((u) => {
+        if (versaoAuth.current === versao) setUsuario(u)
+      })
+      .catch(() => undefined)
+      .finally(() => setCarregando(false))
+
+    const invalidar = () => {
+      versaoAuth.current += 1
+      setUsuario(null)
       setCarregando(false)
-    })
+    }
+    window.addEventListener(EVENTO_NAO_AUTORIZADO, invalidar)
+    return () => window.removeEventListener(EVENTO_NAO_AUTORIZADO, invalidar)
   }, [])
 
   async function entrar(email: string, senha: string): Promise<string | null> {
     try {
       const { usuario: u } = await apiLogin(email, senha)
+      versaoAuth.current += 1
       setUsuario(u)
       return null
     } catch (e) {
@@ -34,8 +47,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function sair(): Promise<void> {
-    await apiLogout().catch(() => undefined)
+    versaoAuth.current += 1
     setUsuario(null)
+    await apiLogout().catch(() => undefined)
   }
 
   return (

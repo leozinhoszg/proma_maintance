@@ -2,16 +2,51 @@ import type {
   Chamado, NovoChamado, Status, Usuario, UsuarioLista, Perfil, Configuracao,
 } from './types'
 
-async function req<T>(url: string, init?: RequestInit & { json?: unknown }): Promise<T> {
+export const EVENTO_NAO_AUTORIZADO = 'proma:nao-autorizado'
+
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+    public readonly code?: string,
+    public readonly cause?: unknown,
+  ) {
+    super(message)
+    this.name = 'ApiError'
+  }
+}
+
+export async function req<T>(url: string, init?: RequestInit & { json?: unknown }): Promise<T> {
   const { json, ...resto } = init ?? {}
-  const res = await fetch(url, {
-    ...resto,
-    headers: json !== undefined ? { 'Content-Type': 'application/json' } : undefined,
-    body: json !== undefined ? JSON.stringify(json) : undefined,
-  })
+  let res: Response
+  try {
+    res = await fetch(url, {
+      ...resto,
+      headers: json !== undefined
+        ? { 'Content-Type': 'application/json', ...resto.headers }
+        : resto.headers,
+      body: json !== undefined ? JSON.stringify(json) : undefined,
+    })
+  } catch (cause) {
+    throw new ApiError('Não foi possível conectar ao servidor', 0, 'NETWORK_ERROR', cause)
+  }
+
   if (res.status === 204) return undefined as T
-  const body = await res.json().catch(() => ({}))
-  if (!res.ok) throw new Error((body as { error?: string }).error ?? `Erro ${res.status}`)
+  let body: unknown
+  try {
+    body = await res.json()
+  } catch (cause) {
+    if (res.ok) throw new ApiError('Resposta inválida do servidor', res.status, 'INVALID_RESPONSE', cause)
+    body = {}
+  }
+
+  if (!res.ok) {
+    const erro = body as { error?: string; code?: string }
+    if (res.status === 401 && typeof window !== 'undefined') {
+      window.dispatchEvent(new Event(EVENTO_NAO_AUTORIZADO))
+    }
+    throw new ApiError(erro.error ?? `Erro ${res.status}`, res.status, erro.code)
+  }
   return body as T
 }
 
@@ -26,8 +61,9 @@ export async function apiEu(): Promise<Usuario | null> {
   try {
     const r = await req<{ usuario: Usuario }>('/api/auth/eu')
     return r.usuario
-  } catch {
-    return null
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 401) return null
+    throw e
   }
 }
 export function apiEsqueciSenha(email: string): Promise<{ mensagem: string }> {

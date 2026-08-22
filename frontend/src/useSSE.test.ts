@@ -1,15 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { renderHook } from '@testing-library/react'
+import { act, renderHook } from '@testing-library/react'
 import { useSSE } from './useSSE'
 
 class FakeEventSource {
   static instances: FakeEventSource[] = []
   listeners: Record<string, (e: any) => void> = {}
   closed = false
+  onopen: (() => void) | null = null
+  onerror: (() => void) | null = null
   constructor(public url: string) { FakeEventSource.instances.push(this) }
   addEventListener(ev: string, cb: (e: any) => void) { this.listeners[ev] = cb }
   close() { this.closed = true }
   emit(ev: string, data: unknown) { this.listeners[ev]?.({ data: JSON.stringify(data) }) }
+  open() { this.onopen?.() }
+  error() { this.onerror?.() }
 }
 
 beforeEach(() => {
@@ -34,5 +38,24 @@ describe('useSSE', () => {
     const es = FakeEventSource.instances[0]
     unmount()
     expect(es.closed).toBe(true)
+  })
+
+  it('notifica abertura e apenas uma desconexão por outage', () => {
+    const onOpen = vi.fn()
+    const onDisconnect = vi.fn()
+    renderHook(() => useSSE({
+      onCriado: vi.fn(), onAtualizado: vi.fn(), onOpen, onDisconnect,
+    }))
+    const es = FakeEventSource.instances[0]
+
+    act(() => {
+      es.open()
+      es.error()
+      es.error()
+      es.open()
+    })
+
+    expect(onOpen).toHaveBeenCalledTimes(2)
+    expect(onDisconnect).toHaveBeenCalledTimes(1)
   })
 })

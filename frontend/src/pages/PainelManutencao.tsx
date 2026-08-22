@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { listarChamados, atualizarStatus } from '../api'
@@ -32,28 +32,80 @@ function dataCurta(iso: string): string {
   return d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
 }
 
+function upsertChamado(lista: Chamado[], chamado: Chamado): Chamado[] {
+  return [chamado, ...lista.filter(({ id }) => id !== chamado.id)]
+}
+
+function mensagemErro(erro: unknown): string {
+  return erro instanceof Error ? erro.message : 'Erro inesperado'
+}
+
 export function PainelManutencao() {
   const { usuario } = useAuth()
   const podeAtender = Boolean(usuario?.perfil.pode_atender)
   const [chamados, setChamados] = useState<Chamado[]>([])
   const [aba, setAba] = useState<Aba>('fila')
+  const [carregando, setCarregando] = useState(true)
+  const [temSnapshot, setTemSnapshot] = useState(false)
+  const [erroDados, setErroDados] = useState<string | null>(null)
+  const [erroAcao, setErroAcao] = useState<string | null>(null)
+  const [pendentes, setPendentes] = useState<Set<number>>(new Set())
+  const reconciliando = useRef<Promise<void> | null>(null)
+  const recebendoSnapshot = useRef(true)
+  const bufferEventos = useRef<Chamado[]>([])
+  const pendentesRef = useRef<Set<number>>(new Set())
   // ids chegados via SSE nesta sessão — recebem o flash âmbar de entrada
   const [novos, setNovos] = useState<Set<number>>(new Set())
   // religa a cada 30s para o tempo de espera não ficar velho
   const [, setTick] = useState(0)
 
+  function reconciliar(inicial = false): Promise<void> {
+    if (reconciliando.current) return reconciliando.current
+    recebendoSnapshot.current = true
+    if (inicial) setCarregando(true)
+
+    const requisicao = listarChamados()
+      .then((snapshot) => {
+        const eventos = bufferEventos.current.splice(0)
+        setChamados(eventos.reduce(upsertChamado, snapshot))
+        setTemSnapshot(true)
+        setErroDados(null)
+      })
+      .catch((erro) => {
+        const eventos = bufferEventos.current.splice(0)
+        if (eventos.length > 0) setChamados((atuais) => eventos.reduce(upsertChamado, atuais))
+        setErroDados(temSnapshot
+          ? `Não foi possível atualizar a fila: ${mensagemErro(erro)}`
+          : `Não foi possível carregar a fila: ${mensagemErro(erro)}`)
+      })
+      .finally(() => {
+        recebendoSnapshot.current = false
+        setCarregando(false)
+        reconciliando.current = null
+      })
+    reconciliando.current = requisicao
+    return requisicao
+  }
+
+  function receberEvento(chamado: Chamado, novo: boolean) {
+    if (novo) setNovos((ids) => new Set(ids).add(chamado.id))
+    if (recebendoSnapshot.current) {
+      bufferEventos.current.push(chamado)
+      return
+    }
+    setChamados((atuais) => upsertChamado(atuais, chamado))
+  }
+
   useEffect(() => {
-    listarChamados().then(setChamados).catch(() => setChamados([]))
+    void reconciliar(true)
     const id = setInterval(() => setTick((t) => t + 1), 30_000)
     return () => clearInterval(id)
   }, [])
 
   const aoVivo = useSSE({
-    onCriado: (c) => {
-      setNovos((s) => new Set(s).add(c.id))
-      setChamados((cs) => [c, ...cs.filter((x) => x.id !== c.id)])
-    },
-    onAtualizado: (c) => setChamados((cs) => cs.map((x) => (x.id === c.id ? c : x))),
+    onCriado: (c) => receberEvento(c, true),
+    onAtualizado: (c) => receberEvento(c, false),
+    onOpen: () => { void reconciliar() },
   })
 
   const fila = useMemo(
@@ -78,9 +130,19 @@ export function PainelManutencao() {
   ).length
 
   async function mudar(id: number, status: Status) {
+    if (pendentesRef.current.has(id)) return
+    pendentesRef.current.add(id)
+    setPendentes(new Set(pendentesRef.current))
+    setErroAcao(null)
     try {
-      await atualizarStatus(id, status)
-    } catch { /* o estado será corrigido pelo SSE se necessário */ }
+      const atualizado = await atualizarStatus(id, status)
+      setChamados((atuais) => upsertChamado(atuais, atualizado))
+    } catch (erro) {
+      setErroAcao(`Não foi possível atualizar o chamado: ${mensagemErro(erro)}`)
+    } finally {
+      pendentesRef.current.delete(id)
+      setPendentes(new Set(pendentesRef.current))
+    }
   }
 
   return (
@@ -99,9 +161,9 @@ export function PainelManutencao() {
             ordem de chegada. <Link className="link-regra" to="/ajuda">Entenda a regra</Link>
           </p>
         </div>
-        <span className={`live-pill ${aoVivo ? 'on' : ''}`}>
+        <span className={`live-pill ${aoVivo ? 'on' : ''}`} role="status" aria-live="polite">
           <span className="led" aria-hidden="true" />
-          {aoVivo ? 'Ao vivo' : 'Conectando…'}
+          {aoVivo ? (temSnapshot ? 'Ao vivo' : 'Conectado · sem snapshot') : 'Conectando…'}
         </span>
       </motion.div>
 
@@ -115,21 +177,21 @@ export function PainelManutencao() {
           className={`andon-cell ${fila.length > 0 ? 'aceso' : ''}`}
           style={{ '--cor': 'var(--red)' } as React.CSSProperties}
         >
-          <div className="valor">{fila.length}</div>
+          <div className="valor">{temSnapshot ? fila.length : '—'}</div>
           <div className="rotulo">Na fila</div>
         </div>
         <div
           className={`andon-cell ${atendimento.length > 0 ? 'aceso' : ''}`}
           style={{ '--cor': 'var(--amber)' } as React.CSSProperties}
         >
-          <div className="valor">{atendimento.length}</div>
+          <div className="valor">{temSnapshot ? atendimento.length : '—'}</div>
           <div className="rotulo">Em atendimento</div>
         </div>
         <div
           className={`andon-cell ${urgentes > 0 ? 'aceso alarme' : ''}`}
           style={{ '--cor': 'var(--red)' } as React.CSSProperties}
         >
-          <div className="valor">{urgentes}</div>
+          <div className="valor">{temSnapshot ? urgentes : '—'}</div>
           <div className="rotulo">Urgentes</div>
         </div>
       </motion.div>
@@ -141,7 +203,7 @@ export function PainelManutencao() {
           className={aba === 'fila' ? 'ativo' : ''}
           onClick={() => setAba('fila')}
         >
-          Na fila <span className="conta">{fila.length}</span>
+          Na fila <span className="conta">{temSnapshot ? fila.length : '—'}</span>
         </button>
         <button
           role="tab"
@@ -149,7 +211,7 @@ export function PainelManutencao() {
           className={aba === 'atendimento' ? 'ativo' : ''}
           onClick={() => setAba('atendimento')}
         >
-          Em atendimento <span className="conta">{atendimento.length}</span>
+          Em atendimento <span className="conta">{temSnapshot ? atendimento.length : '—'}</span>
         </button>
         <button
           role="tab"
@@ -157,11 +219,23 @@ export function PainelManutencao() {
           className={aba === 'concluidos' ? 'ativo' : ''}
           onClick={() => setAba('concluidos')}
         >
-          Concluídos <span className="conta">{concluidos.length}</span>
+          Concluídos <span className="conta">{temSnapshot ? concluidos.length : '—'}</span>
         </button>
       </div>
 
-      {visiveis.length === 0 && <p className="vazio">{VAZIO_POR_ABA[aba]}</p>}
+      {erroDados && (
+        <div className="stamp erro" role="alert">
+          {erroDados}{' '}
+          <button className="acao" type="button" onClick={() => { void reconciliar(!temSnapshot) }}>
+            Tentar novamente
+          </button>
+        </div>
+      )}
+      {erroAcao && <div className="stamp erro" role="alert">{erroAcao}</div>}
+      {carregando && !temSnapshot && <p className="vazio" role="status">Carregando chamados…</p>}
+      {!carregando && temSnapshot && visiveis.length === 0 && (
+        <p className="vazio">{VAZIO_POR_ABA[aba]}</p>
+      )}
 
       <div className="chamados-lista">
         {visiveis.map((c, i) => {
@@ -174,7 +248,7 @@ export function PainelManutencao() {
               className={[
                 'chamado',
                 c.prioridade === 'urgente' && c.status !== 'concluido' ? 'eh-urgente' : '',
-                c.maquina_parada && c.status !== 'concluido' ? 'eh-parada' : '',
+                Boolean(c.maquina_parada) && c.status !== 'concluido' ? 'eh-parada' : '',
               ].join(' ')}
               style={{ '--cor-status': st.cor } as React.CSSProperties}
               initial={
@@ -204,7 +278,7 @@ export function PainelManutencao() {
                   <span className={`tag ${c.prioridade === 'urgente' ? 'urgente' : ''}`}>
                     prioridade {c.prioridade}
                   </span>
-                  {c.maquina_parada && <span className="tag parada">máquina parada</span>}
+                  {Boolean(c.maquina_parada) && <span className="tag parada">máquina parada</span>}
                 </div>
                 <p className="chamado-desc">{c.descricao}</p>
                 <span className="chamado-quem">
@@ -221,13 +295,21 @@ export function PainelManutencao() {
                   {c.status === 'concluido' && `concluído ${dataCurta(c.atualizado_em)}`}
                 </span>
                 {podeAtender && c.status === 'aberto' && (
-                  <button className="acao" onClick={() => mudar(c.id, 'em_atendimento')}>
-                    Assumir
+                  <button
+                    className="acao"
+                    disabled={pendentes.has(c.id)}
+                    onClick={() => mudar(c.id, 'em_atendimento')}
+                  >
+                    {pendentes.has(c.id) ? 'Atualizando…' : 'Assumir'}
                   </button>
                 )}
                 {podeAtender && c.status === 'em_atendimento' && (
-                  <button className="acao concluir" onClick={() => mudar(c.id, 'concluido')}>
-                    Concluir
+                  <button
+                    className="acao concluir"
+                    disabled={pendentes.has(c.id)}
+                    onClick={() => mudar(c.id, 'concluido')}
+                  >
+                    {pendentes.has(c.id) ? 'Atualizando…' : 'Concluir'}
                   </button>
                 )}
               </div>

@@ -1,4 +1,4 @@
-import { Suspense, lazy, useState } from 'react'
+import { Suspense, lazy, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { criarChamado } from '../api'
 import type { NovoChamado, Prioridade, TipoProblema } from '../types'
@@ -31,6 +31,8 @@ export function AbrirChamado() {
   const [form, setForm] = useState<NovoChamado>(vazio)
   const [msg, setMsg] = useState<string | null>(null)
   const [erro, setErro] = useState<string | null>(null)
+  const [enviando, setEnviando] = useState(false)
+  const envioEmCurso = useRef(false)
 
   function set<K extends keyof NovoChamado>(k: K, v: NovoChamado[K]) {
     setForm((f) => ({ ...f, [k]: v }))
@@ -38,6 +40,9 @@ export function AbrirChamado() {
 
   async function enviar(e: React.FormEvent) {
     e.preventDefault()
+    if (envioEmCurso.current) return
+    envioEmCurso.current = true
+    setEnviando(true)
     setErro(null); setMsg(null)
     try {
       const c = await criarChamado(form)
@@ -45,6 +50,9 @@ export function AbrirChamado() {
       setForm(vazio)
     } catch (err) {
       setErro((err as Error).message)
+    } finally {
+      envioEmCurso.current = false
+      setEnviando(false)
     }
   }
 
@@ -155,7 +163,9 @@ export function AbrirChamado() {
           </div>
 
           <div className="os-actions">
-            <button className="primario" type="submit">Abrir chamado</button>
+            <button className="primario" type="submit" disabled={enviando}>
+              {enviando ? 'Abrindo…' : 'Abrir chamado'}
+            </button>
           </div>
         </motion.form>
 
