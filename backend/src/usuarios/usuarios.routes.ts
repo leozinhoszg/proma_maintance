@@ -6,6 +6,7 @@ import { criarTokenSenha } from '../auth/auth.service.js'
 import { enviarEmail } from '../email/email.service.js'
 import { emailConvite } from '../email/templates.js'
 import { obterConfig, obterConfigNumero } from '../configuracoes/configuracoes.service.js'
+import { closeUser } from '../sse/sse.broker.js'
 
 const router = Router()
 router.use('/usuarios', exigirAuth, exigirPermissao('pode_administrar'))
@@ -120,6 +121,7 @@ router.patch('/usuarios/:id', asyncHandler(async (req, res) => {
   // desativar ou trocar perfil revoga as sessões abertas do usuário
   if (mudancas.ativo === false || mudancas.perfil_id !== undefined) {
     await knex('sessoes').where({ usuario_id: id }).del()
+    closeUser(id)
   }
   const atualizado = await knex('usuarios')
     .join('perfis', 'usuarios.perfil_id', 'perfis.id')

@@ -8,6 +8,7 @@ declare global {
   namespace Express {
     interface Request {
       usuario?: UsuarioAutenticado
+      sessao?: { id: number; expiraEm: Date }
     }
   }
 }
@@ -19,12 +20,13 @@ export async function exigirAuth(req: Request, res: Response, next: NextFunction
       res.status(401).json({ error: 'não autenticado' })
       return
     }
-    const usuario = await validarSessao(token)
-    if (!usuario) {
+    const sessao = await validarSessao(token)
+    if (!sessao) {
       res.status(401).json({ error: 'não autenticado' })
       return
     }
-    req.usuario = usuario
+    req.usuario = sessao.usuario
+    req.sessao = { id: sessao.id, expiraEm: sessao.expiraEm }
     next()
   } catch (e) {
     next(e)

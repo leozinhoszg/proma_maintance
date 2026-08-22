@@ -6,6 +6,7 @@ import { asyncHandler } from '../http/async.js'
 import { enviarEmail } from '../email/email.service.js'
 import { emailReset } from '../email/templates.js'
 import { obterConfig, obterConfigNumero } from '../configuracoes/configuracoes.service.js'
+import { closeSession, closeUser } from '../sse/sse.broker.js'
 
 const router = Router()
 
@@ -50,8 +51,13 @@ router.post('/auth/login', limiteLogin, asyncHandler(async (req, res) => {
 
 router.post('/auth/logout', asyncHandler(async (req, res) => {
   const token = req.cookies?.[COOKIE_SESSAO]
-  if (typeof token === 'string') await logout(token)
-  res.clearCookie(COOKIE_SESSAO, { path: '/' })
+  let sessionId: number | null = null
+  try {
+    if (typeof token === 'string') sessionId = await logout(token)
+  } finally {
+    res.clearCookie(COOKIE_SESSAO, { path: '/' })
+  }
+  if (sessionId !== null) closeSession(sessionId)
   res.status(204).end()
 }))
 
@@ -89,6 +95,7 @@ router.post('/auth/redefinir-senha', limiteReset, asyncHandler(async (req, res) 
     res.status(400).json({ error: r.erro })
     return
   }
+  closeUser(r.usuarioId)
   res.json({ ok: true })
 }))
 
