@@ -82,3 +82,10 @@ export function closeAllConnections(): void {
 export function contarConexoes(): number {
   return conexoes.size
 }
+
+export function encerrarConexoes(): void {
+  for (const res of conexoes) {
+    res.end()
+  }
+  conexoes.clear()
+}
