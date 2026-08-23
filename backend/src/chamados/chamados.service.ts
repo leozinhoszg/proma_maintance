@@ -1,9 +1,9 @@
 import knex from '../db/knex.js'
+import type { Knex } from 'knex'
 import {
   type Chamado,
   type NovoChamado,
   type Status,
-  proximoStatusValido,
 } from './chamados.types.js'
 
 const TABELA = 'chamados'
@@ -14,11 +14,23 @@ const CAMPOS = [
   'atendente.nome as atendente_nome',
 ]
 
-function comNomes() {
-  return knex(TABELA)
+function comNomes(db: Knex | Knex.Transaction = knex) {
+  return db(TABELA)
     .join('usuarios as solicitante', 'chamados.solicitante_id', 'solicitante.id')
     .leftJoin('usuarios as atendente', 'chamados.atendente_id', 'atendente.id')
     .select(CAMPOS)
+}
+
+export class ChamadoNaoEncontradoError extends Error {
+  constructor() {
+    super('chamado nao encontrado')
+  }
+}
+
+export class TransicaoChamadoConflitanteError extends Error {
+  constructor() {
+    super('transicao invalida ou estado desatualizado')
+  }
 }
 
 export async function criarChamado(dados: NovoChamado, solicitanteId: number): Promise<Chamado> {
@@ -33,14 +45,20 @@ export async function listarChamados(status?: Status): Promise<Chamado[]> {
 }
 
 export async function atualizarStatus(id: number, novo: Status, usuarioId: number): Promise<Chamado> {
-  const atual = await knex(TABELA).where({ id }).first()
-  if (!atual) throw new Error('chamado nao encontrado')
-  if (!proximoStatusValido(atual.status, novo)) throw new Error('transicao invalida')
+  if (novo === 'aberto') throw new TransicaoChamadoConflitanteError()
 
-  // assumir registra quem atende; concluir preserva o atendente original
+  const statusAtual: Status = novo === 'em_atendimento' ? 'aberto' : 'em_atendimento'
   const mudancas: Record<string, unknown> = { status: novo }
   if (novo === 'em_atendimento') mudancas.atendente_id = usuarioId
-  await knex(TABELA).where({ id }).update(mudancas)
 
-  return (await comNomes().where({ 'chamados.id': id }).first()) as Chamado
+  return knex.transaction(async (trx) => {
+    const alterados = await trx(TABELA).where({ id, status: statusAtual }).update(mudancas)
+    if (alterados === 0) {
+      const existente = await trx(TABELA).where({ id }).first('id')
+      if (!existente) throw new ChamadoNaoEncontradoError()
+      throw new TransicaoChamadoConflitanteError()
+    }
+
+    return (await comNomes(trx).where({ 'chamados.id': id }).first()) as Chamado
+  })
 }
