@@ -22,7 +22,7 @@
     "express-rate-limit": "^8.6.2",
     "helmet": "^8.2.0",
     "knex": "^3.1.0",
-    "mysql2": "^3.11.0",
+    "mysql2": "^3.23.4",
     "nodemailer": "^9.0.3"
   },
   "devDependencies": {
