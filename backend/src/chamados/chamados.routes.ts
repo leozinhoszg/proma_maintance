@@ -17,14 +17,19 @@ import { asyncHandler } from '../http/async.js'
 
 const router = Router()
 
-function validarNovo(body: any): string | null {
+export function validarNovo(body: unknown): string | null {
+  if (typeof body !== 'object' || body === null || Array.isArray(body)) {
+    return 'body deve ser um objeto JSON'
+  }
+  const dados = body as Record<string, unknown>
   const campos = ['maquina', 'setor', 'tipo_problema', 'prioridade', 'descricao']
   for (const c of campos) {
-    if (typeof body[c] !== 'string' || body[c].trim() === '') return `campo obrigatorio: ${c}`
+    const valor = dados[c]
+    if (typeof valor !== 'string' || valor.trim() === '') return `campo obrigatorio: ${c}`
   }
-  if (!TIPOS_PROBLEMA.includes(body.tipo_problema)) return 'tipo_problema invalido'
-  if (!PRIORIDADES.includes(body.prioridade)) return 'prioridade invalida'
-  if (typeof body.maquina_parada !== 'boolean') return 'maquina_parada deve ser booleano'
+  if (!TIPOS_PROBLEMA.includes(dados.tipo_problema as (typeof TIPOS_PROBLEMA)[number])) return 'tipo_problema invalido'
+  if (!PRIORIDADES.includes(dados.prioridade as (typeof PRIORIDADES)[number])) return 'prioridade invalida'
+  if (typeof dados.maquina_parada !== 'boolean') return 'maquina_parada deve ser booleano'
   return null
 }
 
