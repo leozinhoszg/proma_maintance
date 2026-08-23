@@ -18,6 +18,12 @@ export interface UsuarioAutenticado {
   perfil: PerfilPermissoes
 }
 
+export interface SessaoAutenticada {
+  id: number
+  expiraEm: Date
+  usuario: UsuarioAutenticado
+}
+
 interface ContextoLogin { ip?: string; userAgent?: string }
 
 type ResultadoLogin =
@@ -76,7 +82,7 @@ export async function login(email: string, senha: string, ctx: ContextoLogin): P
   return { ok: true, token, expiraEm, usuario: montarUsuario(linha) }
 }
 
-export async function validarSessao(token: string): Promise<UsuarioAutenticado | null> {
+export async function validarSessao(token: string): Promise<SessaoAutenticada | null> {
   const linha = await knex('sessoes')
     .join('usuarios', 'sessoes.usuario_id', 'usuarios.id')
     .join('perfis', 'usuarios.perfil_id', 'perfis.id')
@@ -90,11 +96,33 @@ export async function validarSessao(token: string): Promise<UsuarioAutenticado |
     return null
   }
   if (!linha.ativo) return null
-  return montarUsuario(linha)
+  return {
+    id: linha.sessao_id,
+    expiraEm: new Date(linha.expira_em),
+    usuario: montarUsuario(linha),
+  }
 }
 
-export async function logout(token: string): Promise<void> {
-  await knex('sessoes').where({ token_hash: hashToken(token) }).del()
+export async function validarSessaoPorId(id: number): Promise<boolean> {
+  const linha = await knex('sessoes')
+    .join('usuarios', 'sessoes.usuario_id', 'usuarios.id')
+    .where({ 'sessoes.id': id })
+    .select('sessoes.expira_em', 'usuarios.ativo')
+    .first()
+
+  if (!linha) return false
+  if (!linha.ativo || new Date(linha.expira_em).getTime() < Date.now()) {
+    await knex('sessoes').where({ id }).del()
+    return false
+  }
+  return true
+}
+
+export async function logout(token: string): Promise<number | null> {
+  const sessao = await knex('sessoes').where({ token_hash: hashToken(token) }).first('id')
+  if (!sessao) return null
+  await knex('sessoes').where({ id: sessao.id }).del()
+  return sessao.id
 }
 
 /** Cria token de definição de senha (convite de novo usuário ou reset). */
@@ -104,8 +132,17 @@ export async function criarTokenSenha(usuarioId: number, tipo: 'convite' | 'rese
     : (await obterConfigNumero('convite_validade_horas', 168)) * 3600_000
   const { token, hash } = gerarToken()
   const validaAte = new Date(Date.now() + validadeMs)
-  await knex('tokens_senha').insert({
-    usuario_id: usuarioId, token_hash: hash, tipo, expira_em: validaAte,
+  await knex.transaction(async (trx) => {
+    const usuario = await trx('usuarios').where({ id: usuarioId }).forUpdate().first('id')
+    if (!usuario) throw new Error('usuario nao encontrado ao criar token')
+
+    await trx('tokens_senha')
+      .where({ usuario_id: usuarioId, tipo })
+      .whereNull('usado_em')
+      .update({ usado_em: new Date() })
+    await trx('tokens_senha').insert({
+      usuario_id: usuarioId, token_hash: hash, tipo, expira_em: validaAte,
+    })
   })
   return { token, validaAte }
 }
@@ -118,7 +155,7 @@ export async function solicitarReset(email: string): Promise<{ token: string; us
   return { token, usuario: { id: usuario.id, nome: usuario.nome, email: usuario.email } }
 }
 
-type ResultadoSimples = { ok: true } | { ok: false; erro: string }
+type ResultadoSimples = { ok: true; usuarioId: number } | { ok: false; erro: string }
 
 /** Vale para reset e para aceite de convite (mesmo mecanismo). */
 export async function redefinirSenha(token: string, novaSenha: string): Promise<ResultadoSimples> {
@@ -127,14 +164,33 @@ export async function redefinirSenha(token: string, novaSenha: string): Promise<
     return { ok: false, erro: `a senha deve ter pelo menos ${minimo} caracteres` }
   }
 
-  const linha = await knex('tokens_senha').where({ token_hash: hashToken(token) }).first()
+  const tokenHash = hashToken(token)
+  const linha = await knex('tokens_senha').where({ token_hash: tokenHash }).first()
   if (!linha || linha.usado_em || new Date(linha.expira_em).getTime() < Date.now()) {
     return { ok: false, erro: 'link inválido ou expirado' }
   }
 
-  await knex('usuarios').where({ id: linha.usuario_id }).update({ senha_hash: await hashSenha(novaSenha) })
-  await knex('tokens_senha').where({ id: linha.id }).update({ usado_em: new Date() })
-  // troca de senha derruba todas as sessões do usuário
-  await knex('sessoes').where({ usuario_id: linha.usuario_id }).del()
-  return { ok: true }
+  const senhaHash = await hashSenha(novaSenha)
+  const alterado = await knex.transaction(async (trx) => {
+    const usuario = await trx('usuarios').where({ id: linha.usuario_id }).forUpdate().first('id')
+    if (!usuario) return false
+
+    const consumidos = await trx('tokens_senha')
+      .where({ id: linha.id, usuario_id: linha.usuario_id, token_hash: tokenHash })
+      .whereNull('usado_em')
+      .where('expira_em', '>', trx.fn.now())
+      .update({ usado_em: new Date() })
+    if (consumidos !== 1) return false
+
+    await trx('usuarios').where({ id: linha.usuario_id }).update({ senha_hash: senhaHash })
+    await trx('tokens_senha')
+      .where({ usuario_id: linha.usuario_id })
+      .whereNull('usado_em')
+      .update({ usado_em: new Date() })
+    await trx('sessoes').where({ usuario_id: linha.usuario_id }).del()
+    return true
+  })
+
+  if (!alterado) return { ok: false, erro: 'link inválido ou expirado' }
+  return { ok: true, usuarioId: linha.usuario_id }
 }

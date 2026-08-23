@@ -2,6 +2,7 @@ import { Router } from 'express'
 import knex from '../db/knex.js'
 import { exigirAuth, exigirPermissao } from '../auth/middleware.js'
 import { asyncHandler } from '../http/async.js'
+import { closeUsers } from '../sse/sse.broker.js'
 
 const router = Router()
 router.use('/perfis', exigirAuth, exigirPermissao('pode_administrar'))
@@ -65,6 +66,7 @@ router.patch('/perfis/:id', asyncHandler(async (req, res) => {
   const usuarios = await knex('usuarios').where({ perfil_id: id }).select('id')
   if (usuarios.length > 0) {
     await knex('sessoes').whereIn('usuario_id', usuarios.map((u) => u.id)).del()
+    closeUsers(usuarios.map((u) => u.id))
   }
   res.json({ id, ...dados })
 }))
